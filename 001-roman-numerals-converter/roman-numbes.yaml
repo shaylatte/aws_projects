@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  The Roman Numerals Converter Application aims to convert the given number to the Roman numerals. The application is to be coded in Python and deployed as a web application with Flask on AWS Elastic Compute Cloud (EC2) Instance using AWS Cloudformation and CLI Services.
+  
+
+Parameters:
+  KeyPair:
+    Description: Choose your keypair
+    Type: AWS::EC2::KeyPair::KeyName
+
+  LatestAMIID:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Description: The SSM parameter name for the instance profile role ARN.
+    Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64'
+
+Resources:
+  ConverterSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable http and ssh (80 and 22 port) # Required
+      SecurityGroupIngress: 
+        - CidrIp: 0.0.0.0/0
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        - CidrIp: 0.0.0.0/0
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+  ConverterHost:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestAMIID
+      InstanceType: t2.micro
+      KeyName: !Ref KeyPair
+      SecurityGroupIds: 
+        - !Ref ConverterSecGroup
+      Tags: 
+        - Key: Name
+          Value: Web Server of ${AWS::StackName}
+      UserData: !Base64 |
+        #! /bin/bash
+        dnf update -y
+        dnf install python3 -y
+        dnf install python3-pip -y
+        pip3 install flask
+        dnf install git -y
+        FOLDER="https://github.com/shaylatte/aws_projects/tree/main/001-roman-numerals-converter/templates"
+        cd /home/ec2-user
+        wget -P templates ${FOLDER}/index.html
+        wget -P templates ${FOLDER}/result.html
+        wget https://raw.githubusercontent.com/shaylatte/aws_projects/refs/heads/main/001-roman-numerals-converter/roman-numerals-converter-app.py
+        python3 roman-numerals-converter-app.py
+Outputs:
+  webSiteURL:
+    Description: URL for newly created Roman Numerals Converter Application
+    Value: !Sub
+      - http://${URLName}
+      - URLName: !GetAtt ConverterHost.PublicDnsName
